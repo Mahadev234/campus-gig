@@ -1,65 +1,72 @@
-import { useState, useEffect } from 'react'
-import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '../firebase'
-import { useAuth } from '../contexts/AuthContext'
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Chat() {
-    const [messages, setMessages] = useState([])
-    const [newMessage, setNewMessage] = useState('')
-    const { currentUser } = useAuth()
+	const { gigId } = useParams();
+	const { currentUser } = useAuth();
+	const [messages, setMessages] = useState([]);
+	const [newMessage, setNewMessage] = useState('');
 
-    useEffect(() => {
-        const q = query(collection(db, 'messages'), orderBy('createdAt'), limit(50))
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const messages = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }))
-            setMessages(messages)
-        })
-        return unsubscribe
-    }, [])
+	useEffect(() => {
+		const messagesQuery = query(
+			collection(db, 'messages'),
+			where('gigId', '==', gigId),
+			orderBy('createdAt', 'asc')
+		);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        if (newMessage.trim() === '') return
+		const unsubscribe = onSnapshot(messagesQuery, (querySnapshot) => {
+			const fetchedMessages = [];
+			querySnapshot.forEach((doc) => {
+				fetchedMessages.push({ id: doc.id, ...doc.data() });
+			});
+			setMessages(fetchedMessages);
+		});
 
-        await addDoc(collection(db, 'messages'), {
-            text: newMessage,
-            createdAt: serverTimestamp(),
-            uid: currentUser.uid,
-            displayName: currentUser.displayName
-        })
+		return () => unsubscribe();
+	}, [gigId]);
 
-        setNewMessage('')
-    }
+	const handleSubmit = async (e) => {
+		e.preventDefault();
+		if (newMessage.trim() === '') return;
 
-    return (
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Chat</h1>
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-                <div className="p-4 h-96 overflow-y-auto">
-                    {messages.map((message) => (
-                        <div key={message.id} className={`mb-2 ${message.uid === currentUser.uid ? 'text-right' : ''}`}>
-                            <span className="inline-block bg-gray-100 rounded-lg px-3 py-2 text-sm">
-                                <strong>{message.displayName}: </strong>{message.text}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-                <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button type="submit" className="mt-2 w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        Send
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
+		await addDoc(collection(db, 'messages'), {
+			gigId,
+			senderId: currentUser.uid,
+			text: newMessage,
+			createdAt: serverTimestamp(),
+		});
+
+		setNewMessage('');
+	};
+
+	return (
+		<div className="container mx-auto p-4">
+			<h1 className="text-2xl font-bold mb-4">Chat for Gig ID: {gigId}</h1>
+			<div className="bg-white p-4 rounded shadow mb-4">
+				<div className="max-h-60 overflow-y-auto">
+					{messages.map((message) => (
+						<div key={message.id} className={`mb-2 ${message.senderId === currentUser.uid ? 'text-right' : 'text-left'}`}>
+							<div className={`inline-block p-2 rounded ${message.senderId === currentUser.uid ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'}`}>
+								<p>{message.text}</p>
+								<p className="text-xs text-gray-500">{new Date(message.createdAt?.toDate()).toLocaleString()}</p>
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+			<form onSubmit={handleSubmit} className="flex">
+				<input
+					type="text"
+					value={newMessage}
+					onChange={(e) => setNewMessage(e.target.value)}
+					placeholder="Type a message..."
+					className="flex-1 border rounded p-2"
+				/>
+				<button type="submit" className="bg-blue-500 text-white rounded px-4 ml-2">Send</button>
+			</form>
+		</div>
+	);
 }

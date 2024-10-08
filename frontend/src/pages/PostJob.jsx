@@ -1,171 +1,131 @@
 import { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function PostJob() {
+    const [title, setTitle] = useState('')
+    const [description, setDescription] = useState('')
+    const [budget, setBudget] = useState('')
+    const [duration, setDuration] = useState('')
+    const [skills, setSkills] = useState('')
+    const [error, setError] = useState('')
+    const navigate = useNavigate()
     const { currentUser } = useAuth()
-    const [job, setJob] = useState({
-        title: '',
-        description: '',
-        budget: '',
-        skills: [],
-    })
-    const [newSkill, setNewSkill] = useState('')
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        setError('')
+
+        if (!title || !description || !budget || !duration || !skills) {
+            setError('Please fill in all fields')
+            return
+        }
+
         try {
-            await addDoc(collection(db, 'jobs'), {
-                ...job,
-                budget: parseFloat(job.budget),
-                userId: currentUser.uid,
+            const docRef = await addDoc(collection(db, 'jobs'), {
+                title,
+                description,
+                budget: parseFloat(budget),
+                duration,
+                skills: skills.split(',').map(skill => skill.trim()),
                 createdAt: serverTimestamp(),
+                employerId: currentUser.uid
             })
-            alert('Job posted successfully!')
-            setJob({ title: '', description: '', budget: '', skills: [] })
-        } catch (error) {
-            console.error('Error posting job: ', error)
-            alert('An error occurred while posting the job.')
+            console.log('Document written with ID: ', docRef.id)
+            navigate('/jobs')
+        } catch (e) {
+            setError('Error adding document: ' + e.message)
         }
-    }
-
-    const addSkill = () => {
-        if (newSkill && !job.skills.includes(newSkill)) {
-            setJob(prev => ({ ...prev, skills: [...prev.skills, newSkill] }))
-            setNewSkill('')
-        }
-    }
-
-    const removeSkill = (skillToRemove) => {
-        setJob(prev => ({
-            ...prev,
-            skills: prev.skills.filter(skill => skill !== skillToRemove)
-        }))
     }
 
     return (
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div className="md:grid md:grid-cols-3 md:gap-6">
-                <div className="md:col-span-1">
-                    <div className="px-4 sm:px-0">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Post a New Job</h3>
-                        <p className="mt-1 text-sm text-gray-600">
-                            Provide details about the job you want to post.
-                        </p>
-                    </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-6">Post a New Job</h1>
+            <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
+                <div className="mb-4">
+                    <label htmlFor="title" className="block text-gray-700 text-sm font-bold mb-2">
+                        Job Title
+                    </label>
+                    <input
+                        type="text"
+                        id="title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="Enter job title"
+                    />
                 </div>
-                <div className="mt-5 md:mt-0 md:col-span-2">
-                    <form onSubmit={handleSubmit}>
-                        <div className="shadow sm:rounded-md sm:overflow-hidden">
-                            <div className="px-4 py-5 bg-white space-y-6 sm:p-6">
-                                <div>
-                                    <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                                        Job Title
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="title"
-                                        id="title"
-                                        required
-                                        value={job.title}
-                                        onChange={(e) => setJob({ ...job, title: e.target.value })}
-                                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                                        Job Description
-                                    </label>
-                                    <div className="mt-1">
-                                        <textarea
-                                            id="description"
-                                            name="description"
-                                            rows={3}
-                                            required
-                                            value={job.description}
-                                            onChange={(e) => setJob({ ...job, description: e.target.value })}
-                                            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"
-                                            placeholder="Describe the job requirements and expectations"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="budget" className="block text-sm font-medium text-gray-700">
-                                        Budget
-                                    </label>
-                                    <div className="mt-1 relative rounded-md shadow-sm">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-gray-500 sm:text-sm">$</span>
-                                        </div>
-                                        <input
-                                            type="number"
-                                            name="budget"
-                                            id="budget"
-                                            required
-                                            value={job.budget}
-                                            onChange={(e) => setJob({ ...job, budget: e.target.value })}
-                                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
-                                        Required Skills
-                                    </label>
-                                    <div className="mt-1 flex rounded-md shadow-sm">
-                                        <input
-                                            type="text"
-                                            name="skills"
-                                            id="skills"
-                                            value={newSkill}
-                                            onChange={(e) => setNewSkill(e.target.value)}
-                                            className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
-                                            placeholder="Add a required skill"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={addSkill}
-                                            className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm"
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {job.skills.map((skill, index) => (
-                                            <span key={index} className="inline-flex rounded-full items-center py-0.5 pl-2.5 pr-1 text-sm font-medium bg-indigo-100 text-indigo-700">
-                                                {skill}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeSkill(skill)}
-                                                    className="flex-shrink-0 ml-0.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-indigo-400 hover:bg-indigo-200 hover:text-indigo-500 focus:outline-none focus:bg-indigo-500 focus:text-white"
-                                                >
-                                                    <span className="sr-only">Remove {skill}</span>
-                                                    <svg className="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
-                                                        <path strokeLinecap="round" strokeWidth="1.5" d="M1 1l6 6m0-6L1 7" />
-                                                    </svg>
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="px-4 py-3 bg-gray-50 text-right sm:px-6">
-                                <button
-                                    type="submit"
-                                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                >
-                                    Post Job
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+                <div className="mb-4">
+                    <label htmlFor="description" className="block text-gray-700 text-sm font-bold mb-2">
+                        Job Description
+                    </label>
+                    <textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="Enter job description"
+                        rows="4"
+                    ></textarea>
                 </div>
-            </div>
+                <div className="mb-4">
+                    <label htmlFor="budget" className="block text-gray-700 text-sm font-bold mb-2">
+                        Budget ($)
+                    </label>
+                    <input
+                        type="number"
+                        id="budget"
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="Enter budget"
+                    />
+                </div>
+                <div className="mb-4">
+                    <label htmlFor="duration" className="block text-gray-700 text-sm font-bold mb-2">
+                        Duration
+                    </label>
+                    <input
+                        type="text"
+                        id="duration"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="e.g., 2 weeks, 1 month"
+                    />
+                </div>
+                <div className="mb-6">
+                    <label htmlFor="skills" className="block text-gray-700 text-sm font-bold mb-2">
+                        Required Skills (comma-separated)
+                    </label>
+                    <input
+                        type="text"
+                        id="skills"
+                        value={skills}
+                        onChange={(e) => setSkills(e.target.value)}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="e.g., React, Node.js, MongoDB"
+                    />
+                </div>
+                {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
+                <div className="flex items-center justify-between">
+                    <button
+                        type="submit"
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    >
+                        Post Job
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/jobs')}
+                        className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
         </div>
     )
 }

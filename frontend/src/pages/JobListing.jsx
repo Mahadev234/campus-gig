@@ -1,36 +1,43 @@
 import { useState, useEffect } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { Link } from 'react-router-dom'
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export default function JobListing() {
     const [jobs, setJobs] = useState([])
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         const fetchJobs = async () => {
-            const jobsCollection = collection(db, 'jobs')
-            const jobSnapshot = await getDocs(jobsCollection)
-            const jobList = jobSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-            setJobs(jobList)
+            const q = query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(20))
+            const querySnapshot = await getDocs(q)
+            const jobsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setJobs(jobsData)
+            setLoading(false)
         }
 
         fetchJobs()
     }, [])
 
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen">Loading...</div>
+    }
+
     return (
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Available Jobs</h1>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-6">Available Jobs</h1>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {jobs.map((job) => (
-                    <div key={job.id} className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900">{job.title}</h3>
-                            <p className="mt-1 max-w-2xl text-sm text-gray-500">{job.description}</p>
-                            <p className="mt-2 text-sm text-gray-500">Budget: ${job.budget}</p>
-                            <button className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                Apply
-                            </button>
+                    <Link key={job.id} to={`/job/${job.id}`} className="block">
+                        <div className="bg-white shadow-md rounded-lg p-6 hover:shadow-lg transition-shadow duration-300">
+                            <h2 className="text-xl font-semibold mb-2">{job.title}</h2>
+                            <p className="text-gray-600 mb-4">{job.description.substring(0, 100)}...</p>
+                            <div className="flex justify-between items-center text-sm text-gray-500">
+                                <span>${job.budget}</span>
+                                <span>{new Date(job.createdAt.toDate()).toLocaleDateString()}</span>
+                            </div>
                         </div>
-                    </div>
+                    </Link>
                 ))}
             </div>
         </div>
